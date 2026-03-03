@@ -8,12 +8,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "form-data": "^4.0.5",
+    "formidable": "^3.5.4",
+    "google-auth-library": "^10.6.1",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/formidable": "^3.4.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
