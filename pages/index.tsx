@@ -59,6 +59,36 @@ function Badge({children,color}: {children:React.ReactNode,color:string}) {
   return <span style={{display:"inline-block",padding:"2px 10px",borderRadius:999,fontSize:11,fontWeight:600,background:`${color}22`,color,letterSpacing:0.5}}>{children}</span>;
 }
 
+// ─── Normalize CF response → dashboard fields ────────────────
+function normalizeResultados(raw: any[]): any[] {
+  const sorted = [...raw].sort((a, b) =>
+    parseFloat(b.PROBA_PAGO ?? b.proba_pago ?? 0) -
+    parseFloat(a.PROBA_PAGO ?? a.proba_pago ?? 0)
+  );
+  const n = sorted.length || 1;
+  return sorted.map((r, idx) => {
+    const prob  = parseFloat(r.PROBA_PAGO   ?? r.proba_pago   ?? 0);
+    const decay = parseInt  (r.DECAY_NIVEL  ?? r.decay_nivel  ?? 1);
+    const gRaw  = parseInt  (r.GENERO       ?? r.genero       ?? 0);
+    return {
+      nombre_deudor:     r.NOMBRE_DEUDOR ?? r.nombre_deudor ?? "",
+      rut:               r.RUT           ?? r.rut           ?? "",
+      primora:           parseFloat(r.PRIMORA  ?? r.primora  ?? 0),
+      importe:           parseFloat(r.IMPORTE  ?? r.importe  ?? 0),
+      edad:              parseFloat(r.EDAD     ?? r.edad     ?? 0),
+      genero:            gRaw === 1 ? "M" : gRaw === 2 ? "F" : "—",
+      industria:         r.INDUSTRIA     ?? r.industria     ?? "SERVICIOS",
+      proba_pago:        prob,
+      pred_pago:         parseInt(r.PRED_PAGO ?? r.pred_pago ?? 0),
+      decay_nivel:       decay,
+      decay_label:       r.DECAY_LABEL   ?? r.decay_label   ?? "",
+      score_prioridad:   parseFloat(r.SCORE_PRIORIDAD ?? r.score_prioridad ?? 0),
+      segmento_pago:     prob >= 0.6 ? "Alta" : prob >= 0.3 ? "Media" : "Baja",
+      nivel_estrategico: Math.min(10, Math.floor(idx * 10 / n) + 1),
+    };
+  });
+}
+
 // ─── API helpers ─────────────────────────────────────────────
 const API = "/api";
 
@@ -97,7 +127,7 @@ function UploadView({onProcess, mandante, setMandante}: {onProcess:(data:any[])=
     try {
       const data = await apiScoreFile(mandante, file);
       clearInterval(iv); setProgress(100);
-      setTimeout(() => { onProcess(data.resultados || []); }, 400);
+      setTimeout(() => { onProcess(normalizeResultados(data.resultados || [])); }, 400);
     } catch(e: any) {
       clearInterval(iv); setError(e.message); setLoading(false); setProgress(0);
     }
