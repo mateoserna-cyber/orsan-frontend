@@ -4,7 +4,6 @@ import { JWT } from "google-auth-library";
 export const config = { api: { bodyParser: false } };
 
 const API_URL = process.env.SCORING_API_URL!;
-const API_KEY = process.env.SCORING_API_KEY!;
 
 async function getGCPToken(): Promise<string | null> {
   try {
@@ -39,21 +38,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? { "Authorization": `Bearer ${token}` }
       : {};
 
-    // Forward directo a Cloud Run con el mismo Content-Type (incluye el boundary)
+    // Forward a Cloud Function (gen2) — retorna JSON directamente
     const contentType = req.headers["content-type"] ?? "multipart/form-data";
 
-    const upstream = await fetch(`${API_URL}/api/v1/scoring/file`, {
+    const upstream = await fetch(API_URL, {
       method: "POST",
       headers: {
         ...authHeaders,
-        "X-API-Key": API_KEY,
         "Content-Type": contentType,
         "Content-Length": rawBody.length.toString(),
       },
       body: rawBody,
     });
-
-    const upstreamContentType = upstream.headers.get("content-type") ?? "";
 
     if (!upstream.ok) {
       const body = await upstream.text();
@@ -61,27 +57,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(upstream.status).json({
         error: `Upstream ${upstream.status}`,
         body: body.slice(0, 300),
-      });
-    }
-
-    // El endpoint devuelve CSV — convertir a JSON para el frontend
-    if (upstreamContentType.includes("text/csv")) {
-      const csv = await upstream.text();
-      const lines = csv.trim().split("\n");
-      const headers = lines[0].split(",");
-      const resultados = lines.slice(1).map((line) => {
-        const vals = line.split(",");
-        const obj: Record<string, any> = {};
-        headers.forEach((h, i) => {
-          const v = vals[i];
-          obj[h] = isNaN(Number(v)) || v === "" ? v : Number(v);
-        });
-        return obj;
-      });
-      return res.status(200).json({
-        status: "success",
-        registros_procesados: resultados.length,
-        resultados,
       });
     }
 
