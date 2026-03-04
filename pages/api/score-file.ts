@@ -3,7 +3,7 @@ import { createSign } from "crypto";
 
 export const config = { api: { bodyParser: false } };
 
-const API_URL = process.env.SCORING_API_URL!;
+const API_URL = (process.env.SCORING_API_URL ?? "").trim();
 
 async function getGCPToken(): Promise<string | null> {
   try {
@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Debug env check — remover después
   const saKeyRaw = process.env.GCP_SA_KEY ?? "";
   const apiUrl   = process.env.SCORING_API_URL ?? "";
-  console.error("[handler] env:", { sa_key_len: saKeyRaw.length, sa_key_start: saKeyRaw.slice(0, 3), api_url: apiUrl.slice(0, 50) });
+  console.error("[handler] env:", { sa_key_len: saKeyRaw.length, api_url_len: apiUrl.length, api_url_trimmed: apiUrl.trim().slice(0, 60) });
 
   try {
     // Leer el cuerpo raw — el browser ya envía multipart/form-data con file + mandante
