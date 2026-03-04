@@ -39,6 +39,9 @@ async function getGCPToken(): Promise<string | null> {
     return data.id_token;
   } catch (e: any) {
     console.error("[getGCPToken] error:", e.message);
+    // Diagnóstico temporal — remover luego
+    const raw = process.env.GCP_SA_KEY ?? "";
+    console.error("[getGCPToken] SA_KEY length:", raw.length, "starts:", raw.slice(0, 5), "API_URL:", process.env.SCORING_API_URL?.slice(0, 40));
     return null;
   }
 }
