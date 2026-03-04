@@ -7,13 +7,12 @@ const API_URL = process.env.SCORING_API_URL!;
 
 async function getGCPToken(): Promise<string | null> {
   try {
-    const raw = process.env.GCP_SA_KEY!;
-    const sa = typeof raw === "string" ? JSON.parse(raw) : raw;
-    const client = new JWT({
-      email: sa.client_email,
-      key: sa.private_key,
-    });
-    return await client.fetchIdToken(API_URL);
+    const sa = JSON.parse(process.env.GCP_SA_KEY!);
+    const jwt = new JWT({ email: sa.client_email, key: sa.private_key });
+    const token = await jwt.fetchIdToken(API_URL);
+    if (!token) throw new Error("fetchIdToken returned empty");
+    console.log("[getGCPToken] token prefix:", token.slice(0, 20));
+    return token;
   } catch (e: any) {
     console.error("[getGCPToken] error:", e.message);
     return null;
