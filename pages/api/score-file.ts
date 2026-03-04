@@ -83,6 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(upstream.status).json({
         error: `Upstream ${upstream.status}`,
         body: body.slice(0, 300),
+        debug: { token_null: token === null, token_prefix: token?.slice(0, 15) ?? "N/A" },
       });
     }
 
