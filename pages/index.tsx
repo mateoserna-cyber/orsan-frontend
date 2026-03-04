@@ -102,13 +102,39 @@ async function apiScore(mandante: string, deudores: unknown[]) {
   return res.json();
 }
 
-async function apiScoreFile(mandante: string, file: File) {
-  const form = new FormData();
-  form.append("file", file);
-  form.append("mandante", mandante);
-  const res = await fetch(`${API}/score-file`, {method:"POST", body:form});
-  if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
-  return res.json();
+async function apiScoreFile(
+  mandante: string,
+  file: File,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{resultados: any[]}> {
+  const text = await file.text();
+  const lines = text.split("\n").filter(l => l.trim());
+  const header = lines[0];
+  const dataLines = lines.slice(1).filter(l => l.trim());
+
+  // Tamaño de chunk: ~3MB de texto para quedar bajo el límite de Vercel
+  const bytesPerRow = text.length / Math.max(1, dataLines.length);
+  const rowsPerChunk = Math.max(200, Math.floor(3_000_000 / bytesPerRow));
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < dataLines.length; i += rowsPerChunk) {
+    chunks.push(dataLines.slice(i, i + rowsPerChunk));
+  }
+
+  const allResults: any[] = [];
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunkCSV = [header, ...chunks[ci]].join("\n");
+    const chunkFile = new File([chunkCSV], file.name, {type:"text/csv"});
+    const form = new FormData();
+    form.append("file", chunkFile);
+    form.append("mandante", mandante);
+    const res = await fetch(`${API}/score-file`, {method:"POST", body:form});
+    if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    allResults.push(...(data.resultados || []));
+    onProgress?.(ci + 1, chunks.length);
+  }
+  return {resultados: allResults};
 }
 
 // ─── UPLOAD VIEW ─────────────────────────────────────────────
@@ -123,13 +149,14 @@ function UploadView({onProcess, mandante, setMandante}: {onProcess:(data:any[])=
   const handleProcess = async () => {
     if (!file || !mandante) return;
     setLoading(true); setError(null); setProgress(0);
-    const iv = setInterval(() => setProgress(p => Math.min(p+8, 85)), 300);
     try {
-      const data = await apiScoreFile(mandante, file);
-      clearInterval(iv); setProgress(100);
+      const data = await apiScoreFile(mandante, file, (done, total) => {
+        setProgress(Math.round((done / total) * 100));
+      });
+      setProgress(100);
       setTimeout(() => { onProcess(normalizeResultados(data.resultados || [])); }, 400);
     } catch(e: any) {
-      clearInterval(iv); setError(e.message); setLoading(false); setProgress(0);
+      setError(e.message); setLoading(false); setProgress(0);
     }
   };
 
