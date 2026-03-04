@@ -51,6 +51,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method Not Allowed: received ${req.method}` });
   }
 
+  // Debug env check — remover después
+  const saKeyRaw = process.env.GCP_SA_KEY ?? "";
+  const apiUrl   = process.env.SCORING_API_URL ?? "";
+  console.log("[handler] env:", { sa_key_len: saKeyRaw.length, sa_key_start: saKeyRaw.slice(0, 3), api_url: apiUrl.slice(0, 50) });
+
   try {
     // Leer el cuerpo raw — el browser ya envía multipart/form-data con file + mandante
     const chunks: Buffer[] = [];
@@ -60,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rawBody = Buffer.concat(chunks);
 
     const token = await getGCPToken();
+    console.log("[handler] token generated:", token !== null, token?.slice(0, 15));
     const authHeaders: Record<string, string> = token
       ? { "Authorization": `Bearer ${token}` }
       : {};
