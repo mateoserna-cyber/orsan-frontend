@@ -35,7 +35,7 @@ async function getGCPToken(): Promise<string | null> {
     });
     const data = await res.json() as Record<string, string>;
     if (!data.id_token) throw new Error(`No id_token in response: ${JSON.stringify(data)}`);
-    console.log("[getGCPToken] OK, prefix:", data.id_token.slice(0, 20));
+    console.error("[getGCPToken] OK, prefix:", data.id_token.slice(0, 20));
     return data.id_token;
   } catch (e: any) {
     console.error("[getGCPToken] error:", e.message);
@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Debug env check — remover después
   const saKeyRaw = process.env.GCP_SA_KEY ?? "";
   const apiUrl   = process.env.SCORING_API_URL ?? "";
-  console.log("[handler] env:", { sa_key_len: saKeyRaw.length, sa_key_start: saKeyRaw.slice(0, 3), api_url: apiUrl.slice(0, 50) });
+  console.error("[handler] env:", { sa_key_len: saKeyRaw.length, sa_key_start: saKeyRaw.slice(0, 3), api_url: apiUrl.slice(0, 50) });
 
   try {
     // Leer el cuerpo raw — el browser ya envía multipart/form-data con file + mandante
@@ -65,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rawBody = Buffer.concat(chunks);
 
     const token = await getGCPToken();
-    console.log("[handler] token generated:", token !== null, token?.slice(0, 15));
+    console.error("[handler] token generated:", token !== null, token?.slice(0, 15));
     const authHeaders: Record<string, string> = token
       ? { "Authorization": `Bearer ${token}` }
       : {};
