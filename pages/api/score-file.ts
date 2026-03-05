@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSign } from "crypto";
 
+export const config = { api: { bodyParser: { sizeLimit: "10mb" } } };
+
 const API_URL = (process.env.SCORING_API_URL ?? "").trim();
 
 async function getGCPToken(): Promise<string | null> {
@@ -45,13 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const body = await new Promise<string>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      req.on("error", reject);
-    });
-
     const token = await getGCPToken();
     const authHeaders: Record<string, string> = token
       ? { Authorization: `Bearer ${token}` }
@@ -63,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...authHeaders,
         "Content-Type": "application/json",
       },
-      body,
+      body: JSON.stringify(req.body),
     });
 
     const data = await upstream.json();
