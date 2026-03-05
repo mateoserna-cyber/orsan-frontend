@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSign } from "crypto";
 
-export const config = { api: { bodyParser: { sizeLimit: "10mb" } } };
+export const config = { api: { bodyParser: { sizeLimit: "20mb" } } };
 
 const API_URL = (process.env.SCORING_API_URL ?? "").trim();
 

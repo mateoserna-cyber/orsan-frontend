@@ -123,8 +123,8 @@ async function apiScoreFile(
   const text = await file.text();
   const rows = csvToObjects(text);
 
-  // ~500 registros por chunk para quedar bajo 4MB de Vercel en JSON
-  const CHUNK = 500;
+  // 200 registros por chunk — requests pequeños, sin saturar Vercel ni CF
+  const CHUNK = 200;
   const chunks: Record<string, string>[][] = [];
   for (let i = 0; i < rows.length; i += CHUNK) {
     chunks.push(rows.slice(i, i + CHUNK));
