@@ -102,33 +102,41 @@ async function apiScore(mandante: string, deudores: unknown[]) {
   return res.json();
 }
 
+function csvToObjects(text: string): Record<string, string>[] {
+  const lines = text.split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(";").map(h => h.trim().replace(/^\uFEFF/, ""));
+  // soporte para coma si no hay punto y coma
+  const sep = headers.length > 1 ? ";" : ",";
+  const cols = headers.length > 1 ? headers : lines[0].split(",").map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(sep);
+    return Object.fromEntries(cols.map((c, i) => [c, (vals[i] ?? "").trim()]));
+  });
+}
+
 async function apiScoreFile(
   mandante: string,
   file: File,
   onProgress?: (done: number, total: number) => void,
 ): Promise<{resultados: any[]}> {
   const text = await file.text();
-  const lines = text.split("\n").filter(l => l.trim());
-  const header = lines[0];
-  const dataLines = lines.slice(1).filter(l => l.trim());
+  const rows = csvToObjects(text);
 
-  // Tamaño de chunk: ~3MB de texto para quedar bajo el límite de Vercel
-  const bytesPerRow = text.length / Math.max(1, dataLines.length);
-  const rowsPerChunk = Math.max(200, Math.floor(3_000_000 / bytesPerRow));
-
-  const chunks: string[][] = [];
-  for (let i = 0; i < dataLines.length; i += rowsPerChunk) {
-    chunks.push(dataLines.slice(i, i + rowsPerChunk));
+  // ~500 registros por chunk para quedar bajo 4MB de Vercel en JSON
+  const CHUNK = 500;
+  const chunks: Record<string, string>[][] = [];
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    chunks.push(rows.slice(i, i + CHUNK));
   }
 
   const allResults: any[] = [];
   for (let ci = 0; ci < chunks.length; ci++) {
-    const chunkCSV = [header, ...chunks[ci]].join("\n");
-    const chunkFile = new File([chunkCSV], file.name, {type:"text/csv"});
-    const form = new FormData();
-    form.append("file", chunkFile);
-    form.append("mandante", mandante);
-    const res = await fetch(`${API}/score-file`, {method:"POST", body:form});
+    const res = await fetch(`${API}/score-file`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mandante, registros: chunks[ci] }),
+    });
     if (!res.ok) throw new Error(`Error ${res.status}: ${await res.text()}`);
     const data = await res.json();
     allResults.push(...(data.resultados || []));

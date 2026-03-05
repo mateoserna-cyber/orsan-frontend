@@ -1,14 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSign } from "crypto";
 
-export const config = { api: { bodyParser: false } };
-
 const API_URL = (process.env.SCORING_API_URL ?? "").trim();
 
 async function getGCPToken(): Promise<string | null> {
   try {
     const sa = JSON.parse(process.env.GCP_SA_KEY!);
-    // Normalizar newlines — Vercel a veces guarda \\n en lugar de \n
     const key = (sa.private_key as string).replace(/\\n/g, "\n");
     const email = sa.client_email as string;
     const now = Math.floor(Date.now() / 1000);
@@ -34,67 +31,48 @@ async function getGCPToken(): Promise<string | null> {
       }),
     });
     const data = await res.json() as Record<string, string>;
-    if (!data.id_token) throw new Error(`No id_token in response: ${JSON.stringify(data)}`);
-    console.error("[getGCPToken] OK, prefix:", data.id_token.slice(0, 20));
+    if (!data.id_token) throw new Error(`No id_token: ${JSON.stringify(data)}`);
     return data.id_token;
   } catch (e: any) {
     console.error("[getGCPToken] error:", e.message);
-    // Diagnóstico temporal — remover luego
-    const raw = process.env.GCP_SA_KEY ?? "";
-    console.error("[getGCPToken] SA_KEY length:", raw.length, "starts:", raw.slice(0, 5), "API_URL:", process.env.SCORING_API_URL?.slice(0, 40));
     return null;
   }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: `Method Not Allowed: received ${req.method}` });
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  // Debug env check — remover después
-  const saKeyRaw = process.env.GCP_SA_KEY ?? "";
-  const apiUrl   = process.env.SCORING_API_URL ?? "";
-  console.error("[handler] env:", { sa_key_len: saKeyRaw.length, api_url_len: apiUrl.length, api_url_trimmed: apiUrl.trim().slice(0, 60) });
-
   try {
-    // Leer el cuerpo raw — el browser ya envía multipart/form-data con file + mandante
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(Buffer.from(chunk));
-    }
-    const rawBody = Buffer.concat(chunks);
+    const body = await new Promise<string>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      req.on("error", reject);
+    });
 
     const token = await getGCPToken();
-    console.error("[handler] token generated:", token !== null, token?.slice(0, 15));
     const authHeaders: Record<string, string> = token
-      ? { "Authorization": `Bearer ${token}` }
+      ? { Authorization: `Bearer ${token}` }
       : {};
-
-    // Forward a Cloud Function (gen2) — retorna JSON directamente
-    const contentType = req.headers["content-type"] ?? "multipart/form-data";
 
     const upstream = await fetch(API_URL, {
       method: "POST",
       headers: {
         ...authHeaders,
-        "Content-Type": contentType,
-        "Content-Length": rawBody.length.toString(),
+        "Content-Type": "application/json",
       },
-      body: rawBody,
+      body,
     });
 
+    const data = await upstream.json();
+
     if (!upstream.ok) {
-      const body = await upstream.text();
-      console.error(`[score-file] upstream ${upstream.status}:`, body.slice(0, 300));
-      return res.status(upstream.status).json({
-        error: `Upstream ${upstream.status}`,
-        body: body.slice(0, 300),
-        debug: { token_null: token === null, token_prefix: token?.slice(0, 15) ?? "N/A" },
-      });
+      return res.status(upstream.status).json(data);
     }
 
-    const data = await upstream.json();
-    res.status(upstream.status).json(data);
+    res.status(200).json(data);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
