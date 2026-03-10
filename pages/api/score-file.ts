@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createSign } from "crypto";
 
+export const maxDuration = 300; // 5 minutos — permite cold start de Vertex AI (hasta 90s) + procesamiento
 export const config = { api: { bodyParser: { sizeLimit: "20mb" } } };
 
 const API_URL = (process.env.SCORING_API_URL ?? "").trim();

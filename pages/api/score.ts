@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { JWT } from "google-auth-library";
 
+export const maxDuration = 300; // 5 minutos
+
 const API_URL = process.env.SCORING_API_URL!;
 const API_KEY = process.env.SCORING_API_KEY!;
 
